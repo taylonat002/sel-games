@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Brooklyn Project • SEL Choice Game</title>
+  <style>
+    :root{
+      --indigo:#3E4A89; --yellow:#F9C846; --coral:#F47C6D; --mint:#A8E6CF; --lav:#C3B1E1; --cream:#FDFBF6; --ink:#263238; --teal:#2c7c7c;
+    }
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--cream);color:var(--ink)}
+    .app{max-width:860px;margin:0 auto;padding:24px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    header .dot{width:14px;height:14px;border-radius:50%}
+    header .dot:nth-child(1){background:var(--indigo)}
+    header .dot:nth-child(2){background:var(--yellow)}
+    header .dot:nth-child(3){background:var(--coral)}
+    h1{font-size:clamp(20px,3.4vw,28px);margin:8px 0}
+    .card{background:#fff;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.08);padding:20px}
+    .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    select,button{border:0;border-radius:12px;padding:12px 14px;font-size:16px}
+    select{background:#fff;box-shadow:inset 0 0 0 2px #e9e9e9}
+    button{background:var(--indigo);color:#fff;cursor:pointer}
+    button.secondary{background:var(--mint);color:#143}
+    .pill{display:inline-block;background:var(--lav);color:#2b2340;padding:6px 10px;border-radius:999px;font-size:12px;margin-left:6px}
+
+    .qwrap{margin-top:14px}
+    .qhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .qnum{font-weight:700;color:#3a3a3a}
+    .prompt{font-size:clamp(18px,2.6vw,22px);line-height:1.35;font-weight:700;color:#1f2a44}
+    .story{margin:8px 0 12px;color:#27313b}
+
+    .options{display:grid;gap:10px}
+    .option{background:#fff;border-radius:14px;padding:12px 14px;box-shadow:inset 0 0 0 2px #eaeaea;display:flex;gap:10px;align-items:flex-start}
+    .option input{margin-top:2px}
+    .explain{font-size:14px;color:#37464f;margin-top:6px}
+
+    .meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .tag{background:var(--yellow);padding:6px 10px;border-radius:999px;font-weight:600}
+
+    .bar{height:10px;background:#eee;border-radius:999px;overflow:hidden;margin:16px 0}
+    .bar > div{height:100%;background:linear-gradient(90deg,var(--indigo),var(--coral));width:0%}
+
+    .result{margin-top:10px;padding:10px;border-radius:12px;display:none}
+    .result.ok{background:#e8f7f0;color:#10543a}
+    .result.no{background:#fff2f0;color:#8a1f11}
+
+    .footer{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+    .small{font-size:12px;color:#5a6b74}
+    .hide{display:none}
+  </style>
+</head>
+<body>
+  <div class="app" role="application" aria-label="SEL Choice Game">
+    <header>
+      <div class="dot" aria-hidden="true"></div>
+      <div class="dot" aria-hidden="true"></div>
+      <div class="dot" aria-hidden="true"></div>
+      <h1>SEL Choice Game <span class="pill">K to 8</span></h1>
+    </header>
+
+    <div class="card">
+      <div class="row">
+        <label for="cat">Category</label>
+        <select id="cat" aria-label="Select category"></select>
+        <button id="start">Start</button>
+        <button id="reset" class="secondary">Reset</button>
+      </div>
+
+      <div class="bar" aria-hidden="true"><div id="prog"></div></div>
+
+      <div id="qwrap" class="qwrap"></div>
+
+      <div class="footer">
+        <button id="check">Check answer</button>
+        <button id="next" class="secondary">Next</button>
+      </div>
+
+      <div id="feedback" class="result" role="status" aria-live="polite"></div>
+
+      <p class="small">Tip: You can embed this game on Wix using the HTML iframe element. No external libraries required.</p>
+    </div>
+  </div>
+
+  <script>
+  // Data model: categories with five scenarios each
+  const DATA = [
+    {
+      id:"everyday", name:"Everyday Choices, Big Feelings", color:"var(--yellow)",
+      items:[
+        { // Scenario 1: Marker Spill
+          prompt:"What do you do?",
+          story:"You are working on an art project when a classmate knocks over their markers and looks embarrassed.",
+          options:[
+            {text:"Let me help you pick those up", correct:true, why:"Kind and helpful. You are showing empathy and teamwork."},
+            {text:"That is not my problem", correct:false, why:"This can make your classmate feel alone."},
+            {text:"You are so clumsy", correct:false, why:"Name calling hurts feelings and trust."},
+            {text:"Ignore it and keep coloring", correct:false, why:"Ignoring someone who needs help can feel unkind."}
+          ]
+        },
+        { // Scenario 2: Playground
+          prompt:"What do you do?",
+          story:"At recess a new student watches your game from the side and looks unsure.",
+          options:[
+            {text:"Want to join us?", correct:true, why:"Inclusive and welcoming. Nice leadership."},
+            {text:"Pretend you did not see them", correct:false, why:"Ignoring can increase loneliness."},
+            {text:"You cannot play with us", correct:false, why:"Excluding others is unfair and unkind."},
+            {text:"Move away so they cannot ask", correct:false, why:"Avoiding blocks connection."}
+          ]
+        },
+        { // Scenario 3: Lost Game
+          prompt:"What do you do?",
+          story:"You lost a board game and feel upset.",
+          options:[
+            {text:"Take a breath and say Good game", correct:true, why:"That is sportsmanship and self control."},
+            {text:"Yell that it was not fair", correct:false, why:"Yelling hurts the mood and does not solve it."},
+            {text:"Knock over the game", correct:false, why:"That damages trust with friends."},
+            {text:"Run away without a word", correct:false, why:"It is kinder to name your feeling or ask for a break."}
+          ]
+        },
+        { // Scenario 4: Stuck in Class
+          prompt:"What do you do?",
+          story:"You feel stuck on a math problem and are getting frustrated.",
+          options:[
+            {text:"Raise your hand and ask for help please", correct:true, why:"Asking for help shows courage and responsibility."},
+            {text:"Hide the page and pretend you are done", correct:false, why:"Hiding blocks learning."},
+            {text:"Say This is stupid", correct:false, why:"That distracts others and does not help."},
+            {text:"Give up and doodle", correct:false, why:"It is ok to feel frustrated. Asking for help moves you forward."}
+          ]
+        },
+        { // Scenario 5: Hurt Feelings
+          prompt:"What do you do?",
+          story:"A friend did not invite you to a party and your feelings are hurt.",
+          options:[
+            {text:"Talk privately and say I felt sad when I was not invited", correct:true, why:"Brave and honest. Opens the door to repair."},
+            {text:"Tell everyone else about it", correct:false, why:"Gossip creates more hurt."},
+            {text:"Say I am not your friend anymore", correct:false, why:"Words said in anger can harm the friendship."},
+            {text:"Give the silent treatment", correct:false, why:"Silence makes it hard to understand your feeling."}
+          ]
+        }
+      ]
+    },
+    {
+      id:"namefeeling", name:"Name That Feeling", color:"var(--mint)",
+      items:[
+        {prompt:"What feeling fits best?", story:"Your stomach has butterflies before a class talk.", options:[
+          {text:"Nervous", correct:true, why:"Body clues can point to nerves."},
+          {text:"Bored", correct:false, why:"Butterflies usually are not boredom."},
+          {text:"Sleepy", correct:false, why:"That does not match the body clue."},
+          {text:"Confused", correct:false, why:"You might also feel confused, but butterflies match nervous."}
+        ]},
+        {prompt:"What feeling fits best?", story:"You feel warm and proud after helping a friend.", options:[
+          {text:"Happy", correct:true, why:"Helping often brings joy and pride."},
+          {text:"Jealous", correct:false, why:"Jealous does not fit here."},
+          {text:"Angry", correct:false, why:"Anger does not match the clue."},
+          {text:"Scared", correct:false, why:"No fear clue here."}
+        ]},
+        {prompt:"Two feelings at once", story:"You are moving to a new class. You will miss your teacher but are excited to meet new friends.", options:[
+          {text:"Sad and excited", correct:true, why:"Mixed feelings are normal."},
+          {text:"Only sad", correct:false, why:"There is also excitement."},
+          {text:"Only excited", correct:false, why:"There is also sadness."},
+          {text:"Angry", correct:false, why:"Anger does not fit the clues given."}
+        ]},
+        {prompt:"Guess the feeling", story:"You lost your toy and your throat feels tight.", options:[
+          {text:"Sad", correct:true, why:"Tight throat can go with sadness."},
+          {text:"Silly", correct:false, why:"That does not fit the body clue."},
+          {text:"Proud", correct:false, why:"Not a match here."},
+          {text:"Calm", correct:false, why:"Body does not sound calm."}
+        ]},
+        {prompt:"Guess the feeling", story:"Someone cut in line and your fists clench.", options:[
+          {text:"Angry", correct:true, why:"Clenched fists can signal anger."},
+          {text:"Hungry", correct:false, why:"That is a different body clue."},
+          {text:"Shy", correct:false, why:"Not a match here."},
+          {text:"Sleepy", correct:false, why:"Not related."}
+        ]}
+      ]
+    },
+    {
+      id:"friendfix", name:"Friendship Fix It", color:"var(--coral)",
+      items:[
+        {prompt:"Repair steps", story:"You interrupted a friend. What can you do?", options:[
+          {text:"Say Sorry for interrupting. Please finish", correct:true, why:"Apology plus repair."},
+          {text:"Say I am just excited", correct:false, why:"Good insight but still needs repair."},
+          {text:"Keep talking", correct:false, why:"That prevents repair."},
+          {text:"Blame them for talking slow", correct:false, why:"Blame harms connection."}
+        ]},
+        {prompt:"When plans change", story:"Your friend cannot hang out today.", options:[
+          {text:"Say I understand. Maybe another day", correct:true, why:"Flexible and kind."},
+          {text:"Say You ruined my day", correct:false, why:"Shaming harms friendship."},
+          {text:"Ignore their message", correct:false, why:"Silence can feel cold."},
+          {text:"Post about it online", correct:false, why:"That can embarrass your friend."}
+        ]},
+        {prompt:"Sharing space", story:"A classmate keeps borrowing your markers without asking.", options:[
+          {text:"Say Please ask first before using my markers", correct:true, why:"Clear boundary stated kindly."},
+          {text:"Hide the markers and say nothing", correct:false, why:"Avoiding does not teach the boundary."},
+          {text:"Yell Stop stealing", correct:false, why:"Name calling harms trust."},
+          {text:"Give away your markers", correct:false, why:"You can keep your boundary and be kind."}
+        ]},
+        {prompt:"Teasing", story:"Someone jokes about your glasses.", options:[
+          {text:"Say I do not like jokes about my glasses", correct:true, why:"Direct and respectful boundary."},
+          {text:"Laugh even if you feel bad", correct:false, why:"That hides your feeling."},
+          {text:"Joke back about them", correct:false, why:"Escalation rarely helps."},
+          {text:"Tell everyone to ignore them forever", correct:false, why:"That can create more conflict."}
+        ]},
+        {prompt:"Join a group", story:"You want to join a game that already started.", options:[
+          {text:"Ask Can I join next round", correct:true, why:"Polite and shows awareness."},
+          {text:"Jump in without asking", correct:false, why:"That can feel rude."},
+          {text:"Say If I cannot play I will tell the teacher", correct:false, why:"Threats harm trust."},
+          {text:"Walk away upset without asking", correct:false, why:"You might miss a kind yes."}
+        ]}
+      ]
+    },
+    {
+      id:"calmtools", name:"Calm Tools in Action", color:"var(--teal)",
+      items:[
+        {prompt:"Pick a tool", story:"You feel mad after being told No.", options:[
+          {text:"Belly breathing for 10 seconds", correct:true, why:"Breathing helps reset your body."},
+          {text:"Shout about it", correct:false, why:"Shouting adds fuel to the fire."},
+          {text:"Throw a pillow at someone", correct:false, why:"Not safe for others."},
+          {text:"Hold your breath", correct:false, why:"That does not calm the body."}
+        ]},
+        {prompt:"Pick a tool", story:"The room is loud and your head hurts.", options:[
+          {text:"Ask for a quiet break or headphones", correct:true, why:"Smart self care and advocacy."},
+          {text:"Stay and hope it stops", correct:false, why:"You have options to care for yourself."},
+          {text:"Push someone for being loud", correct:false, why:"Not safe and not kind."},
+          {text:"Hide under the table without telling an adult", correct:false, why:"Better to ask for a break."}
+        ]},
+        {prompt:"Pick a tool", story:"You feel wiggly and cannot focus on reading.", options:[
+          {text:"Take a movement break then try again", correct:true, why:"Movement can reset focus."},
+          {text:"Keep forcing it for an hour", correct:false, why:"That can increase frustration."},
+          {text:"Give up on reading forever", correct:false, why:"Skills grow with practice and breaks."},
+          {text:"Throw the book", correct:false, why:"Not safe and not helpful."}
+        ]},
+        {prompt:"Pick a tool", story:"You feel worried before a test.", options:[
+          {text:"Positive self talk and 4 by 4 breathing", correct:true, why:"Breath plus kind words can lower worry."},
+          {text:"Scroll videos to distract for an hour", correct:false, why:"Short escape, not a tool."},
+          {text:"Tell yourself You always fail", correct:false, why:"That increases worry."},
+          {text:"Skip the test without telling anyone", correct:false, why:"Avoiding creates new problems."}
+        ]},
+        {prompt:"Pick a tool", story:"You argued with a sibling and feel hot and tense.", options:[
+          {text:"Ask for a time out to cool down", correct:true, why:"Breaks protect the relationship."},
+          {text:"Keep arguing louder", correct:false, why:"Louder rarely helps."},
+          {text:"Say mean things", correct:false, why:"Words can hurt deeply."},
+          {text:"Hold it in and pretend you are fine", correct:false, why:"Feelings need a safe outlet."}
+        ]}
+      ]
+    }
+  ];
+
+  // State
+  let state = { cat:0, idx:0, selected:null, correctCount:0 };
+
+  const catSel = document.getElementById('cat');
+  const startBtn = document.getElementById('start');
+  const resetBtn = document.getElementById('reset');
+  const qwrap = document.getElementById('qwrap');
+  const feedback = document.getElementById('feedback');
+  const checkBtn = document.getElementById('check');
+  const nextBtn = document.getElementById('next');
+  const prog = document.getElementById('prog');
+
+  // Build category select
+  DATA.forEach((c,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i; opt.textContent=c.name; catSel.appendChild(opt);
+  });
+
+  function render(){
+    const cat = DATA[state.cat];
+    const item = cat.items[state.idx];
+    const total = cat.items.length;
+    const pct = Math.round((state.idx)/total*100);
+    prog.style.width = pct + '%';
+
+    qwrap.innerHTML = `
+      <div class="qhead">
+        <div class="qnum">Question ${state.idx+1} of ${total}</div>
+        <div class="tag" style="background:${cat.color}">${cat.name}</div>
+      </div>
+      <div class="prompt">${item.prompt}</div>
+      <div class="story">${item.story}</div>
+      <fieldset class="options" role="radiogroup" aria-label="Answer choices">
+        ${item.options.map((o,idx)=>`
+          <label class="option">
+            <input type="radio" name="opt" value="${idx}" aria-label="${o.text}" />
+            <div>
+              <div>${o.text}</div>
+            </div>
+          </label>
+        `).join('')}
+      </fieldset>
+    `;
+
+    feedback.style.display='none';
+    state.selected=null;
+
+    qwrap.querySelectorAll('input[name="opt"]').forEach(r=>{
+      r.addEventListener('change', e=>{ state.selected = Number(e.target.value); });
+    });
+  }
+
+  function check(){
+    const cat = DATA[state.cat];
+    const item = cat.items[state.idx];
+    if(state.selected==null){
+      feedback.textContent = 'Please choose an option';
+      feedback.className='result no';
+      feedback.style.display='block';
+      return;
+    }
+    const choice = item.options[state.selected];
+    const ok = !!choice.correct;
+    if(ok) state.correctCount++;
+    feedback.innerHTML = `<strong>${ok ? 'Nice choice' : 'Try again'}</strong> • ${choice.why}`;
+    feedback.className = ok ? 'result ok' : 'result no';
+    feedback.style.display='block';
+  }
+
+  function next(){
+    const cat = DATA[state.cat];
+    if(state.idx < cat.items.length - 1){
+      state.idx++; render();
+    } else {
+      // finish screen
+      prog.style.width = '100%';
+      qwrap.innerHTML = `
+        <div class="prompt">You finished ${cat.name}</div>
+        <p>You answered <strong>${state.correctCount}</strong> of <strong>${cat.items.length}</strong> in a kind and thoughtful way.</p>
+        <p class="small">Play another category or replay to practice.</p>
+      `;
+      feedback.style.display='none';
+    }
+  }
+
+  function start(){
+    state.cat = Number(catSel.value);
+    state.idx = 0; state.selected=null; state.correctCount=0; render();
+  }
+
+  function reset(){ state = { cat:Number(catSel.value), idx:0, selected:null, correctCount:0 }; render(); }
+
+  startBtn.addEventListener('click', start);
+  resetBtn.addEventListener('click', reset);
+  checkBtn.addEventListener('click', check);
+  nextBtn.addEventListener('click', next);
+
+  // init
+  start();
+  </script>
+</body>
+</html>
